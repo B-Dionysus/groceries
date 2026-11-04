@@ -2,45 +2,54 @@
         # await page.fill("input[type='password']", "ADIDIEx2m")
 import asyncio
 from playwright.async_api import async_playwright
-from playwright_stealth import Stealth
 
 async def download_marianos_receipt():
-    # 1. Initialize the stealth engine wrapper
-    async with Stealth().use_async(async_playwright()) as p:
-        print("Launching stealth browser context...")
-        browser = await p.chromium.launch(
-           headless=True,
-           args=["--disable-http2"]
+    async with async_playwright() as p:
+        print("Launching visible browser with persistent context...")
+        
+        # 1. Use launch_persistent_context to store cookies and profile data locally
+        # 2. Set headless=False so it renders naturally like a standard browser
+        context = await p.chromium.launch_persistent_context(
+            user_data_dir="./marianos_profile",
+            headless=False, 
+            viewport={'width': 1280, 'height': 800},
+            args=["--disable-http2"] # Keeps connections on reliable HTTP/1.1
         )
         
-        context = await browser.new_context(
-            viewport={'width': 1920, 'height': 1080},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        )
-        page = await context.new_page()
+        page = context.pages[0] if context.pages else await context.new_page()
         
-        # 2. Go to the sign-in page
-        print("Navigating to Mariano's sign-in page...")
-        await page.goto("https://marianos.com")
+        # Increase connection timeout limits to handle script initialization overhead
+        page.set_default_navigation_timeout(60000)
         
-        # NOTE: Supply your real username and password credentials here
-        print("Entering credentials...")        
-        await page.fill("input[type='email']", "marianos@sixbynine.com")
-        await page.fill("input[type='password']", "ADIDIEx2m")
-        await page.click("button[type='submit']")
-        await page.wait_for_load_state("networkidle")
-        
-        # 3. Pull transaction history page
-        print("Fetching purchase history dashboard...")
-        await page.goto("https://marianos.com")
-        await page.wait_for_load_state("networkidle")
-        
-        # 4. Generate the statement capture
-        await page.pdf(path="marianos_receipt.pdf", format="A4")
-        print("Success! Captured and saved to marianos_receipt.pdf")
-        
-        await browser.close()
+        try:
+            print("Navigating to Mariano's portal...")
+            # Navigate explicitly to the base secure URL string
+            await page.goto("https://marianos.com", wait_until="commit")
+            
+            # Pause to see if it renders or triggers a login check
+            await asyncio.sleep(5)
+            
+            print("Entering credentials...")        
+            await page.fill("input[type='email']", "marianos@sixbynine.com")
+            await page.fill("input[type='password']", "ADIDIEx2m")
+            await page.click("button[type='submit']")
+            await page.wait_for_load_state("networkidle")
+            
+            print("Fetching recent purchases...")
+            await page.goto("https://marianos.com", wait_until="networkidle")
+            
+            # Print snapshot
+            await page.pdf(path="marianos_receipt.pdf", format="A4")
+            print("Success! Saved to marianos_receipt.pdf")
+            
+        except Exception as e:
+            print(f"An unexpected error occurred during execution: {e}")
+            # Take a screenshot to see exactly where it got stuck or what it loaded
+            await page.screenshot(path="timeout_diagnostic.png")
+            print("Diagnostic screenshot saved to timeout_diagnostic.png")
+            
+        finally:
+            await context.close()
 
-# Kick off the async loop
 if __name__ == "__main__":
     asyncio.run(download_marianos_receipt())
