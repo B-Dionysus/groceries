@@ -2,8 +2,8 @@ import os
 import time
 from playwright.sync_api import sync_playwright
 
-MARIANOS_EMAIL = os.getenv("MARIANOS_EMAIL", "your-email@example.com")
-MARIANOS_PASSWORD = os.getenv("MARIANOS_PASSWORD", "your-password-here")
+MARIANOS_EMAIL = os.getenv("MARIANOS_EMAIL", "marianos@sixbynine.com")
+MARIANOS_PASSWORD = os.getenv("MARIANOS_PASSWORD", "Unpadded~Dedicator~Debrief2")
 SESSION_FILE = "marianos_session.json"
 
 
