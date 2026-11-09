@@ -54,30 +54,48 @@ def login():
         dismiss_popups(page)
 
         try:
-            # 2. Wait for email field
+          try:
+            # 1. Wait for the real visible email field (avoiding the honeypot)
             print("Entering email...")
-            email_input = page.wait_for_selector('input[type="email"], input#email', timeout=15000)
+            # We look for #signInName first (standard Azure B2C), or any VISIBLE text/email input
+            email_selector = 'input#signInName, input[type="text"]:visible, input[type="email"]:not([aria-hidden="true"])'
+            
+            email_input = page.locator(email_selector).first
+            email_input.wait_for(state="visible", timeout=20000)
+            
             email_input.click()
-            page.keyboard.type(MARIANOS_EMAIL, delay=75)
+            page.keyboard.type(MARIANOS_EMAIL, delay=60)
 
-            # 3. Wait for password field
+            # 2. Wait for the real password field
             print("Entering password...")
-            password_input = page.wait_for_selector('input[type="password"], input#password', timeout=10000)
+            password_selector = 'input#password, input[type="password"]:not([aria-hidden="true"])'
+            
+            password_input = page.locator(password_selector).first
+            password_input.wait_for(state="visible", timeout=10000)
+            
             password_input.click()
-            page.keyboard.type(MARIANOS_PASSWORD, delay=75)
+            page.keyboard.type(MARIANOS_PASSWORD, delay=60)
 
-            # 4. Click Sign In
+            # 3. Click the Submit button
+            # Azure B2C submit buttons are usually id="next" or type="submit"
             print("Submitting login form...")
-            sign_in_button = page.locator('button[type="submit"], button#signInSubmitBtn')
-            sign_in_button.click()
+            submit_btn = page.locator('button#next, button[type="submit"]:visible').first
+            submit_btn.click()
 
-            print("\nWaiting for redirect / completion...")
-            page.wait_for_url(lambda url: "signin" not in url, timeout=60000)
+            # 4. Wait for redirection away from the Azure B2C login domain
+            print("\nSubmitted! Waiting for redirect back to Mariano's...")
+            print("(If a CAPTCHA or 2FA code is requested, complete it in the browser window.)")
+
+            page.wait_for_url(lambda url: "login.kroger.com" not in url, timeout=60000)
             page.wait_for_load_state("networkidle", timeout=10000)
 
             # 5. Save the session
             context.storage_state(path=SESSION_FILE)
-            print(f"Session saved successfully to {SESSION_FILE}!")
+            print(f"\n🎉 SUCCESS! Session saved to {SESSION_FILE}")
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            time.sleep(10)
 
         except Exception as e:
             print(f"An error occurred: {e}")
