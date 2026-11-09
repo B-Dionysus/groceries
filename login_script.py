@@ -93,7 +93,7 @@ def login():
             context.storage_state(path=SESSION_FILE)
             print(f"\n🎉 SUCCESS! Session saved to {SESSION_FILE}")
 
-        except Exception as e:
+            except Exception as e:
             print(f"An error occurred: {e}")
             time.sleep(10)
 
