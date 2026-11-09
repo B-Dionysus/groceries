@@ -1,15 +1,17 @@
 import os
 import time
 from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth_sync
+from playwright_stealth import Stealth
 
-MARIANOS_EMAIL = os.getenv("MARIANOS_EMAIL", "marianos@sixbynine.com")
-MARIANOS_PASSWORD = os.getenv("MARIANOS_PASSWORD", "Unpadded~Dedicator~Debrief2")
+
+MARIANOS_EMAIL = os.getenv("MARIANOS_EMAIL", "your-email@example.com")
+MARIANOS_PASSWORD = os.getenv("MARIANOS_PASSWORD", "your-password-here")
 SESSION_FILE = "marianos_session.json"
 
 
 def login():
-    with sync_playwright() as p:
+    # Stealth v2 wraps sync_playwright directly
+    with Stealth().use_sync(sync_playwright()) as p:
         browser = p.chromium.launch(
             headless=False,
             args=[
@@ -20,27 +22,21 @@ def login():
         
         context = browser.new_context(
             viewport={"width": 1280, "height": 800},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            locale="en-US",
-            timezone_id="America/Chicago"
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         )
         
         page = context.new_page()
-
-        # Apply stealth patches to mask Playwright
-        stealth_sync(page)
 
         print("Navigating to Mariano's...")
         page.goto("https://www.marianos.com/signin", wait_until="domcontentloaded")
 
         try:
-            # 1. Email input
+            # 1. Email input (avoiding the honeypot)
             print("Locating visible email input...")
             email_selector = 'input#signInName, input[type="text"]:visible, input[type="email"]:not([aria-hidden="true"])'
             email_input = page.locator(email_selector).first
             email_input.wait_for(state="visible", timeout=25000)
             
-            # Click and pause briefly like a human
             email_input.click()
             time.sleep(0.5)
             page.keyboard.type(MARIANOS_EMAIL, delay=85)
@@ -55,7 +51,7 @@ def login():
             password_input.click()
             time.sleep(0.5)
             page.keyboard.type(MARIANOS_PASSWORD, delay=90)
-            time.sleep(1.0)  # Critical pause before clicking submit
+            time.sleep(1.0)
 
             # 3. Submit
             print("Submitting login form...")
@@ -65,11 +61,11 @@ def login():
             print("\nWaiting for redirect back to Mariano's...")
             print("(If 2FA / SMS verification is requested, complete it in the browser.)")
 
-            # Wait until we leave Kroger's login domain
+            # 4. Wait for redirect
             page.wait_for_url(lambda url: "login.kroger.com" not in url, timeout=60000)
             page.wait_for_load_state("networkidle", timeout=10000)
 
-            # 4. Save session state
+            # 5. Save session state
             context.storage_state(path=SESSION_FILE)
             print(f"\n🎉 SUCCESS! Session saved to {SESSION_FILE}")
 
